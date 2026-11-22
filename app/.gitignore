@@ -1,0 +1,7 @@
+/coverage/
+/bin/
+/.cache/
+/node_modules/
+.env
+.env.*
+.idea/

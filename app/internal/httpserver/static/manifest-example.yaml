@@ -1,0 +1,8 @@
+services:
+  web:
+    image: docker.io/library/nginx:1-alpine
+
+x-launcher:
+  endpoint:
+    service: web
+    port: 80

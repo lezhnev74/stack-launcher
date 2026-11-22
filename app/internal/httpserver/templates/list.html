@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Runs | Stack Launcher</title>
+  {{ template "style" }}
+</head>
+<body>
+  {{ template "nav" "runs" }}
+  <main>
+    <header class="page-heading">
+      <div>
+        <h1>Runs</h1>
+        <p>Configure and launch temporary Compose environments.</p>
+      </div>
+    </header>
+
+    <section class="panel" aria-labelledby="new-run-title">
+      <h2 id="new-run-title">New run</h2>
+      {{ if .Templates }}
+      <form id="new-run" class="inline-form" method="post" action="/ui/runs">
+        <div>
+          <label for="manifest-template">Start from a template</label>
+          <select id="manifest-template" name="template" required>
+            <option value="">Choose a template</option>
+            {{ range .Templates }}<option value="{{ . }}">{{ . }}</option>{{ end }}
+          </select>
+        </div>
+        <button class="primary" disabled type="submit">Create run</button>
+        <p class="feedback" role="status"></p>
+      </form>
+      {{ else }}
+      <p class="muted">Create a template to start your first run.</p>
+      <a class="button primary" href="/ui/templates/edit">New template</a>
+      {{ end }}
+    </section>
+
+    <section aria-labelledby="runs-title">
+      <h2 id="runs-title" class="section-title">All runs</h2>
+      {{ if .Statuses }}
+      <div class="table">
+        <table>
+          <thead><tr>
+            <th scope="col">Run</th>
+            <th scope="col">State</th>
+            <th scope="col">Expires</th>
+            <th scope="col">App URL</th>
+          </tr></thead>
+          <tbody>
+            {{ range .Statuses }}
+            <tr>
+              <td>
+                <a class="record-link" href="/ui/stacks?id={{ .ID }}">{{ .ID }}</a><br>
+                {{ if .TemplateName }}<small>{{ .TemplateName }}</small>{{ else }}<small>{{ .Hostname }}</small>{{ end }}
+              </td>
+              <td><span class="state" data-state="{{ .State }}">{{ .State }}</span></td>
+              <td>{{ if .ExpiresAt }}<time datetime="{{ .ExpiresAt }}">{{ .ExpiresAt }}</time>{{ else }}—{{ end }}</td>
+              <td>{{ if .URL }}<a href="{{ .URL }}">{{ .URL }}</a>{{ else }}—{{ end }}</td>
+            </tr>
+            {{ end }}
+          </tbody>
+        </table>
+      </div>
+      {{ else }}
+      <div class="panel empty">No runs yet.</div>
+      {{ end }}
+    </section>
+  </main>
+  <script src="/ui/controller.js" defer></script>
+</body>
+</html>

@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+set -euo pipefail
+cd -- "$(dirname -- "${BASH_SOURCE[0]}")"
+
+image=localhost/stack-launcher-tools:go1.27.4
+command=${1:-help}
+usage() {
+  echo 'Usage: ./dev {setup|check|lint|test-go|fuzz|build|security|format}'
+}
+
+if (( $# > 1 )); then
+  usage >&2
+  exit 2
+fi
+case "$command" in
+  help|-h|--help) usage; exit ;;
+  setup) exec podman build --pull=missing --tag "$image" -f Containerfile.tools . ;;
+  check|lint|test-go|fuzz|build|security|format) ;;
+  *) usage >&2; exit 2 ;;
+esac
+
+if ! podman image exists "$image"; then
+  echo 'Run ./dev setup to build the QA tools image.' >&2
+  exit 1
+fi
+container=(podman run --rm --pull=never --userns=keep-id --init)
+
+if [[ "$command" == format ]]; then
+  exec "${container[@]}" --network=none \
+    -v "$PWD/cmd:/workspace/cmd:z" -v "$PWD/internal:/workspace/internal:z" \
+    "$image" gofmt -w cmd internal
+fi
+
+build_cache="$PWD/.cache/go-build"
+mkdir -p coverage "$build_cache"
+report=$(mktemp -d "$PWD/coverage/dev-XXXXXXXX")
+snapshot=$(mktemp -d)
+trap 'rm -rf -- "$snapshot"' EXIT
+tar --exclude=.git --exclude=.env --exclude='.env.*' --exclude=coverage --exclude=bin --exclude=node_modules \
+  --exclude=./.cache -cf - . \
+  | tar -xf - -C "$snapshot"
+
+echo "Reports: $report"
+"${container[@]}" -v "$snapshot:/workspace:ro,z" -v "$report:/results:z" \
+  -v "$build_cache:/tmp/go-build:z" \
+  -e "FUZZ_TIME=${FUZZ_TIME:-5s}" \
+  "$image" bash scripts/qa.sh "$command"

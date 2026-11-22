@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ if .ID }}{{ .ID }}{{ else if .Name }}{{ .Name }}{{ else }}New template{{ end }} | Stack Launcher</title>
+  {{ template "style" }}
+</head>
+<body>
+  {{ if .ID }}{{ template "nav" "runs" }}{{ else }}{{ template "nav" "templates" }}{{ end }}
+  <main>
+    <a class="back-link" href="{{ if .ID }}/ui{{ else }}/ui/templates{{ end }}">{{ if .ID }}All runs{{ else }}All templates{{ end }}</a>
+    <header class="page-heading">
+      <div>
+        <h1>{{ if .ID }}{{ .ID }} <span class="state" data-state="draft">draft</span>{{ else if .Name }}{{ .Name }}{{ else }}New template{{ end }}</h1>
+      </div>
+      {{ if not .ID }}
+      <div class="template-save">
+        <button class="primary" form="configuration" type="submit" value="save" disabled>Save template</button>
+        <p id="configuration-feedback" class="feedback" role="status">Loading configuration…</p>
+      </div>
+      {{ end }}
+    </header>
+
+    <form id="configuration" class="workspace" method="post" autocomplete="off"
+          data-id="{{ .ID }}" data-name="{{ .Name }}" data-launch-disabled="{{ .LaunchDisabled }}">
+      <div class="panel-stack">
+        {{ if .ID }}
+        <section class="panel" aria-labelledby="service-refs-title">
+          <h2 id="service-refs-title">Service images</h2>
+          <ul id="service-references" class="service-rows"></ul>
+        </section>
+        {{ else }}
+        <section class="panel">
+          <label for="template-name">Template name</label>
+          <input id="template-name" name="name" value="{{ .Name }}" type="text" placeholder="e.g. QA environment" required maxlength="255">
+        </section>
+        {{ end }}
+
+        {{ if .ID }}{{ template "environment-section" }}{{ end }}
+
+        <details class="panel manifest-panel" {{ if or (not .ID) .Seed.Problem }}open{{ end }}>
+          <summary>Compose manifest</summary>
+          <div class="flow">
+            {{ if not .ID }}
+            <div class="file-toolbar">
+              <label class="file-label">Import YAML <input id="manifest-file" type="file" accept=".yaml,.yml"></label>
+              <a href="/ui/manifest-example.yaml" download>Download starter YAML</a>
+            </div>
+            {{ end }}
+            <div id="manifest-yaml" class="code-editor manifest-editor"></div>
+            <button id="inspect-manifest" type="button" disabled>Update services</button>
+            <p id="manifest-feedback" class="feedback" role="status"></p>
+          </div>
+        </details>
+
+        {{ if not .ID }}{{ template "environment-section" }}{{ end }}
+      </div>
+      {{ if .ID }}
+      <aside class="panel config-actions">
+        <h2>Launch settings</h2>
+        <dl class="compact-facts">
+          <dt>Source template</dt><dd>{{ .Name }}</dd>
+          <dt>Time to live</dt><dd>7 days from launch</dd>
+        </dl>
+        {{ if .LaunchDisabled }}<p class="notice">{{ .LaunchDisabled }}</p>{{ end }}
+        <button class="primary launch" type="submit" value="launch" disabled>Launch run</button>
+        <button type="submit" value="save" disabled>Save draft</button>
+        <button type="button" class="danger" id="remove-draft" disabled>Discard draft</button>
+        <p id="configuration-feedback" class="feedback" role="status">Loading configuration…</p>
+      </aside>
+      {{ else }}
+      <aside class="panel service-summary" aria-labelledby="service-summary-title">
+        <h2 id="service-summary-title">Services</h2>
+        <div id="service-summary" aria-live="polite"></div>
+      </aside>
+      {{ end }}
+    </form>
+    <script id="configuration-data" type="application/json">{{ .Seed }}</script>
+  </main>
+  <script src="/ui/controller.js" defer></script>
+</body>
+</html>
+
+{{ define "environment-section" }}
+<section class="panel" aria-labelledby="environment-title">
+  <h2 id="environment-title">Environment variables</h2>
+  <p id="environment-help" class="muted">Choose a service and enter one override per line as <code>KEY=value</code>. Use <code>KEY=</code> for an empty value. Remove an override to restore its default.</p>
+  {{ template "environment-fields" }}
+</section>
+{{ end }}
+
+{{ define "environment-fields" }}
+<div id="environment-picker" class="environment-picker" hidden>
+  <label for="environment-service">Service</label>
+  <select id="environment-service"></select>
+</div>
+<div id="environment-editors"></div>
+{{ end }}

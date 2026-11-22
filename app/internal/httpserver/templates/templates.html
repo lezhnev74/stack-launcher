@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Templates | Stack Launcher</title>
+  {{ template "style" }}
+</head>
+<body>
+  {{ template "nav" "templates" }}
+  <main>
+    <header class="page-heading">
+      <div>
+        <h1>Templates</h1>
+        <p>Manage reusable Compose manifests and per-service environment overrides.</p>
+      </div>
+      <a class="button primary" href="/ui/templates/edit">New template</a>
+    </header>
+    {{ if . }}
+    <div class="table template-table">
+      <table aria-label="Saved templates">
+        <thead><tr><th scope="col">Name</th><th scope="col">Services</th><th scope="col">Actions</th></tr></thead>
+        <tbody>
+          {{ range . }}
+          <tr>
+            <th scope="row"><span class="template-name"><span class="template-icon" aria-hidden="true"></span>{{ .Name }}</span></th>
+            <td>
+              {{ if .Services }}
+              <ul class="template-services">
+                {{ range .Services }}<li><code>{{ . }}</code></li>{{ end }}
+              </ul>
+              {{ else }}<span class="muted">Services unavailable</span>{{ end }}
+            </td>
+            <td><a class="button template-edit" href="/ui/templates/edit?name={{ .Name }}" aria-label="Edit {{ .Name }}">Edit</a></td>
+          </tr>
+          {{ end }}
+        </tbody>
+      </table>
+    </div>
+    {{ else }}
+    <section class="panel empty">
+      <h2>No templates yet</h2>
+      <p>Start with the example manifest or import a Compose YAML file.</p>
+    </section>
+    {{ end }}
+  </main>
+</body>
+</html>

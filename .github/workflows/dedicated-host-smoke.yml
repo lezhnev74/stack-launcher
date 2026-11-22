@@ -1,0 +1,48 @@
+name: Dedicated host smoke
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    if: github.ref == 'refs/heads/master'
+    runs-on:
+      group: stack-launcher-smoke
+    environment: stack-launcher-smoke
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Launch fixture and probe ingress
+        env:
+          STACK_LAUNCHER_URL: ${{ vars.STACK_LAUNCHER_URL }}
+          FIXTURE_REFERENCE: ${{ vars.STACK_LAUNCHER_FIXTURE_REFERENCE }}
+          STACK_CLEANUP_TIMEOUT: '360'
+        run: |
+          set -eu
+          if [[ -z "$STACK_LAUNCHER_URL" ]]; then
+            echo 'Set the STACK_LAUNCHER_URL configuration variable in the stack-launcher-smoke environment' >&2
+            exit 1
+          fi
+          if [[ ! "$FIXTURE_REFERENCE" =~ ^https://github\.com/[^/]+/[^/]+/blob/[0-9a-f]{40}/.+$ ]]; then
+            echo 'Set STACK_LAUNCHER_FIXTURE_REFERENCE to a GitHub blob URL pinned to a full commit' >&2
+            exit 1
+          fi
+          request=$(jq -n --arg reference "$FIXTURE_REFERENCE" '{reference: $reference, duration: "30m"}')
+          exec app/scripts/with-stack.sh bash -euc '
+            if [[ "$STACK_URL" != https://* ]]; then
+              echo "Expected an HTTPS stack URL, got $STACK_URL" >&2
+              exit 1
+            fi
+            body=$(mktemp)
+            trap '\''rm -f -- "$body"'\'' EXIT
+            code=$(curl --disable --globoff --silent --show-error --max-time 15 --retry 2 --retry-all-errors --retry-max-time 20 -o "$body" -w "%{http_code}" "$STACK_URL")
+            if [[ "$code" != 200 || "$(cat "$body")" != stack-launcher-smoke-ok ]]; then
+              echo "Expected HTTP 200 and the smoke fixture marker at $STACK_URL, got HTTP $code" >&2
+              exit 1
+            fi
+          ' <<< "$request"
