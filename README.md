@@ -4,7 +4,7 @@ Launch temporary Compose stacks for automated tests, manual testing, and demos.
 Run multiple versions side by side on one Linux host, using registry images or
 images built from Git. Start runs from the web UI or the API.
 
-![Run details showing a ready stack, its URL, and port bindings](app/docs/images/run-details.png)
+![Ready run showing its URL, port bindings, and the selected service’s environment overrides and image](app/docs/images/run-details.png)
 
 ## How it works
 
@@ -92,7 +92,8 @@ data.
 6. Open `http://127.0.0.1:8080/ui` on the host or through an SSH tunnel. In
    **Templates → New template**, name and save the built-in Nginx example.
    In **Runs**, select that template, click **Create run**, then **Launch run**.
-   When the run is ready, open the URL under **Access**. Use **Remove** to clean up.
+   When the run is ready, open the URL at the top of the run page. Use **Remove**
+   to clean up.
 
 To run your own stack, see the [Compose manifest guide](MANIFEST.md).
 
