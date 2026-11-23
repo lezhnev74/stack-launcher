@@ -33,7 +33,7 @@ func TestRetryFailedDraft(t *testing.T) {
 		t.Fatal(err)
 	}
 	failForRetry(t, a, id)
-	requirePage(t, a, "/ui/stacks?id="+id, `value="retry">Retry launch`, "fixture failure")
+	requirePage(t, a, "/ui/stacks?id="+id, `value="retry"`, "lucide-play", "Retry launch", "fixture failure")
 	if w := serve(a, http.MethodPut, "/stacks/"+id+"/environment", `{"environment":{"web":{"MODE":"fixed"}}}`); w.Code != 409 {
 		t.Fatalf("replace overrides after launch: %d %s", w.Code, w.Body)
 	}

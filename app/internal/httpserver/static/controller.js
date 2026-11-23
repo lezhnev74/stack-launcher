@@ -290,6 +290,75 @@
     });
   }
 
+  function mountRunServices(workspace) {
+    if (!workspace) return;
+    const list = workspace.querySelector('.service-tabs');
+    const tabs = [...list.querySelectorAll('.service-tab')];
+    const panels = [...workspace.querySelectorAll('.service-panel')];
+    const editors = new Map();
+    let selected = 0;
+    let mountEnvironment;
+
+    function showEnvironment() {
+      if (!mountEnvironment) return;
+      const panel = panels[selected];
+      if (!editors.has(panel)) {
+        const host = panel.querySelector('.environment-service');
+        const saved = JSON.parse(panel.querySelector('script').textContent) ?? {};
+        host.hidden = false;
+        editors.set(panel, mountEnvironment(host, tabs[selected].textContent, saved));
+        panel.querySelector('.run-environment-fallback').hidden = true;
+      }
+      editors.get(panel).requestMeasure();
+    }
+
+    function select(index) {
+      selected = index;
+      for (const [position, tab] of tabs.entries()) {
+        const active = position === index;
+        tab.setAttribute('aria-selected', String(active));
+        tab.tabIndex = active ? 0 : -1;
+        panels[position].hidden = !active;
+      }
+      showEnvironment();
+    }
+
+    list.setAttribute('role', 'tablist');
+    list.setAttribute('aria-orientation', 'vertical');
+    for (const [index, tab] of tabs.entries()) {
+      tab.setAttribute('role', 'tab');
+      tab.setAttribute('aria-controls', panels[index].id);
+      panels[index].setAttribute('role', 'tabpanel');
+      panels[index].tabIndex = 0;
+      tab.addEventListener('click', event => {
+        event.preventDefault();
+        select(index);
+      });
+    }
+    list.addEventListener('keydown', event => {
+      const last = tabs.length - 1;
+      let next;
+      switch (event.key) {
+        case 'ArrowUp': next = selected === 0 ? last : selected - 1; break;
+        case 'ArrowDown': next = selected === last ? 0 : selected + 1; break;
+        case 'Home': next = 0; break;
+        case 'End': next = last; break;
+        default: return;
+      }
+      event.preventDefault();
+      select(next);
+      tabs[next].focus();
+    });
+    const linked = panels.findIndex(panel => '#' + panel.id === location.hash);
+    select(linked === -1 ? 0 : linked);
+    import('/ui/environment-editor.js').then(({mountReadOnlyEnvironment}) => {
+      mountEnvironment = mountReadOnlyEnvironment;
+      showEnvironment();
+    }).catch(() => {
+      // Keep the server-rendered values if the editor bundle cannot load.
+    });
+  }
+
   function mountOriginalManifest(query) {
     const panel = document.querySelector('#original-manifest');
     const source = document.querySelector('#manifest-source');
@@ -368,6 +437,7 @@
   }
 
   if (detail) {
+    mountRunServices(detail.querySelector('#run-services'));
     const id = detail.dataset.id;
     const endpoint = '/stacks/' + encodeURIComponent(id);
     if (actions) actions.addEventListener('submit', event => {

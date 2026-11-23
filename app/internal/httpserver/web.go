@@ -6,7 +6,10 @@ import (
 	"embed"
 	"encoding/json"
 	"html/template"
+	"maps"
 	"net/http"
+	"slices"
+	"time"
 
 	"stack-launcher.local/app/internal/compose"
 	"stack-launcher.local/app/internal/ledger"
@@ -25,13 +28,28 @@ type stackList struct {
 type stackDetail struct {
 	ledger.Status
 	Ports                        map[string]map[int]string
-	Environment                  ledger.Environment
-	References                   []compose.ServiceReference
+	Services                     map[string]runService
 	Activity                     []ledger.LaunchActivity
 	CanStop, CanStart, CanRemove bool
 }
 
 func (s stackDetail) InProgress() bool { return s.State == "launching" || s.State == "starting" }
+
+func (s stackDetail) ExpiryLabel() string {
+	expires, err := time.Parse(time.RFC3339Nano, s.ExpiresAt)
+	if err != nil {
+		return s.ExpiresAt
+	}
+	return expires.UTC().Format("2 Jan 2006, 15:04 MST")
+}
+
+func (s stackDetail) ServiceNames() []string { return slices.Sorted(maps.Keys(s.Services)) }
+
+type runService struct {
+	Environment map[string]string
+	Source      compose.ServiceReference
+	Image       ledger.Image
+}
 
 type templateSummary struct {
 	Name     string
@@ -169,27 +187,52 @@ func (a *api) loadRunConfiguration(ctx context.Context, detail *stackDetail) err
 	if err != nil {
 		return err
 	}
-	detail.Environment = env
-	if detail.HasManifest {
-		return a.loadRunManifest(ctx, detail)
+	detail.Services = make(map[string]runService)
+	for name, values := range env {
+		detail.Services[name] = runService{Environment: values}
 	}
-	return nil
+	if err := a.loadRunManifest(ctx, detail); err != nil {
+		return err
+	}
+	return a.loadRunImages(ctx, detail)
 }
 
 func (a *api) loadRunManifest(ctx context.Context, detail *stackDetail) error {
+	if !detail.HasManifest {
+		return nil
+	}
 	source, err := a.db.GetManifest(ctx, detail.ID)
 	if err != nil {
 		return err
 	}
-	// Even if the Compose source is invalid, the saved overrides remain viewable.
-	services, _ := compose.ServiceNames(source)
-	for _, service := range services {
-		if _, ok := detail.Environment[service]; !ok {
-			detail.Environment[service] = nil
+	refs, err := compose.TemplateServices(source)
+	if err != nil {
+		// Show any readable service names alongside saved overrides for failed runs.
+		names, _ := compose.ServiceNames(source)
+		for _, name := range names {
+			refs = append(refs, compose.ServiceReference{Name: name})
 		}
 	}
-	if source.References != nil {
-		detail.References, _ = compose.TemplateServices(source)
+	for _, ref := range refs {
+		service := detail.Services[ref.Name]
+		service.Source = ref
+		detail.Services[ref.Name] = service
+	}
+	return nil
+}
+
+func (a *api) loadRunImages(ctx context.Context, detail *stackDetail) error {
+	if !detail.HasImages {
+		return nil
+	}
+	images, err := a.db.GetImages(ctx, detail.ID)
+	if err != nil {
+		return err
+	}
+	for name, image := range images {
+		service := detail.Services[name]
+		service.Image = image
+		detail.Services[name] = service
 	}
 	return nil
 }

@@ -9,60 +9,30 @@
 <body>
   {{ template "nav" "runs" }}
   <main id="detail" data-id="{{ .ID }}" data-state="{{ .State }}" data-in-progress="{{ .InProgress }}">
-    <a class="back-link" href="/ui">All runs</a>
-    <header class="page-heading">
-      <div>
-        <h1>{{ .ID }} <span class="state" data-state="{{ .State }}">{{ .State }}</span></h1>
-      </div>
-      {{ if or .CanStop .CanStart .CanRemove .Retryable }}
-      <form id="actions" method="post" class="action-row">
-        {{ if .CanStop }}<button disabled type="submit" value="stop">{{ if eq .State "stopping" }}Retry stop{{ else }}Stop{{ end }}</button>{{ end }}
-        {{ if .CanStart }}<button class="primary" disabled type="submit" value="start">Start</button>{{ end }}
-        {{ if .Retryable }}<button class="primary" disabled type="submit" value="retry">Retry launch</button>{{ end }}
-        {{ if .CanRemove }}<button class="danger" disabled type="submit" value="remove">{{ if eq .State "removing" }}Retry remove{{ else }}Remove{{ end }}</button>{{ end }}
-        <p class="feedback" role="status"></p>
-      </form>
-      {{ end }}
-    </header>
-
-    {{ if .APIOwned }}
-    <details class="panel" {{ if or .InProgress .Failure }}open{{ end }}>
-      <summary>Launch log</summary>
-      <ol class="progress-log" id="progress-log" aria-label="Launch activity" aria-live="polite" tabindex="0" {{ if not .Activity }}hidden{{ end }}>
-        {{ range .Activity }}
-        <li><time datetime="{{ .Time.Format "2006-01-02T15:04:05Z07:00" }}">{{ .Time.Format "2006-01-02 15:04:05" }} UTC</time><span>{{ .Message }}</span></li>
-        {{ end }}
-      </ol>
-      <p id="progress-empty" class="muted" {{ if .Activity }}hidden{{ end }}>{{ if .InProgress }}Waiting for startup to begin…{{ else }}No launch activity was recorded for this run.{{ end }}</p>
-      <p class="feedback" id="poll-status" role="status"></p>
-    </details>
-    {{ end }}
-    {{ if and (not .InProgress) (or .Failure .Pending) }}
-    <section class="panel failure" aria-labelledby="failure-title">
-      <h2 id="failure-title">Run activity</h2>
-      <dl class="compact-facts">
-        {{ if .Pending }}<dt>Caddy route</dt><dd>Confirmation pending</dd>{{ end }}
-        {{ if .FailurePhase }}<dt>Failure phase</dt><dd>{{ .FailurePhase }}</dd>{{ end }}
-        {{ if .Failure }}<dt>Details</dt><dd><pre>{{ .Failure }}</pre></dd>{{ end }}
-      </dl>
-    </section>
-    {{ end }}
-
-    <section class="panel access" aria-labelledby="access-title">
-      <h2 id="access-title">Access</h2>
-      {{ if .URL }}<a class="endpoint" href="{{ .URL }}">{{ .URL }}</a>{{ end }}
-      <dl class="compact-facts">
-        {{ if .TemplateName }}<dt>Source template</dt><dd>{{ .TemplateName }}</dd>{{ end }}
-        <dt>Hostname</dt><dd>{{ .Hostname }}</dd>
-        <dt>Expires</dt><dd>{{ if .ExpiresAt }}<time datetime="{{ .ExpiresAt }}">{{ .ExpiresAt }}</time>{{ else }}—{{ end }}</dd>
-      </dl>
+    {{ template "run-breadcrumbs" .ID }}
+    <section class="panel run-access" aria-labelledby="access-title">
+      <header class="run-access-header">
+        <div class="run-access-toolbar">
+          <span class="state" data-state="{{ .State }}">{{ .State }}</span>
+          {{ if or .CanStop .CanStart .CanRemove .Retryable }}
+          <form id="actions" method="post" class="action-row">
+            {{ if .CanStop }}<button class="with-icon" disabled type="submit" value="stop">{{ template "icon" "pause" }}{{ if eq .State "stopping" }}Retry stop{{ else }}Stop{{ end }}</button>{{ end }}
+            {{ if .CanStart }}<button class="primary with-icon" disabled type="submit" value="start">{{ template "icon" "play" }}Resume</button>{{ end }}
+            {{ if .Retryable }}<button class="primary with-icon" disabled type="submit" value="retry">{{ template "icon" "play" }}Retry launch</button>{{ end }}
+            {{ if .CanRemove }}<button class="danger with-icon" disabled type="submit" value="remove">{{ template "icon" "trash" }}{{ if eq .State "removing" }}Retry remove{{ else }}Remove{{ end }}</button>{{ end }}
+            <p class="feedback" role="status"></p>
+          </form>
+          {{ end }}
+        </div>
+        <h1 id="access-title">{{ if .URL }}<a href="{{ .URL }}">{{ .URL }}</a>{{ else }}Access{{ end }}</h1>
+      </header>
       {{ if .Ports }}
-      <div class="table">
+      <div class="table port-bindings" role="region" aria-label="Port bindings" tabindex="0">
         <table>
           <thead><tr>
             <th scope="col">Service</th>
             <th scope="col">Container port</th>
-            <th scope="col">Launcher host binding</th>
+            <th scope="col">Host binding</th>
           </tr></thead>
           <tbody>
             {{ range $service, $ports := .Ports }}
@@ -78,53 +48,95 @@
       {{ end }}
     </section>
 
-    <details id="original-manifest" class="panel">
-      <summary>Original manifest</summary>
-      <pre id="manifest-source" class="manifest-source" aria-label="Original Compose YAML" tabindex="0" hidden></pre>
-      <p id="manifest-status" class="feedback" role="status"></p>
-      <noscript><a href="/ui/stacks/manifest?id={{ .ID }}">Open original YAML</a></noscript>
-    </details>
-
-    {{ if .References }}
-    <section class="panel" aria-labelledby="versions-title">
-      <h2 id="versions-title">Service images</h2>
-      <ul class="service-rows">
-        {{ range .References }}
-        <li class="service-row">
-          <div><strong>{{ .Name }}</strong>
-            {{ if .Repository }}<small>{{ .Repository }}</small>{{ end }}
-          </div>
-          <code>{{ .Value }}</code>
-        </li>
-        {{ end }}
-      </ul>
-    </section>
-    {{ end }}
-
-    {{ if or .APIOwned .Environment }}
-    <section class="panel" aria-labelledby="environment-title">
-      <h2 id="environment-title">Environment variables</h2>
-      <p class="muted">Saved overrides are read-only once launch begins.</p>
-      {{ if .Environment }}
-      <div class="environment-overrides">
-        {{ range $service, $values := .Environment }}
-        <details>
-          <summary><code>{{ $service }}</code> <span class="muted">{{ len $values }} {{ if eq (len $values) 1 }}override{{ else }}overrides{{ end }}</span></summary>
-          {{ if $values }}
-          <dl class="compact-facts">
-            {{ range $key, $value := $values }}
-            <dt><code>{{ $key }}</code></dt>
-            <dd>{{ if eq $value "" }}<span class="muted">Empty string</span>{{ else }}<pre><span>{{ $value }}</span></pre>{{ end }}</dd>
-            {{ end }}
-          </dl>
-          {{ else }}<p class="muted">No saved overrides.</p>{{ end }}
-        </details>
-        {{ end }}
+    <section class="panel" aria-labelledby="services-title">
+      <h2 id="services-title">Services</h2>
+      {{ if .Services }}
+      {{ $names := .ServiceNames }}
+      <div id="run-services" class="run-services">
+        <div class="service-tabs" aria-labelledby="services-title">
+          {{ range $index, $name := $names }}
+          <a class="service-tab" id="service-tab-{{ $index }}" href="#service-panel-{{ $index }}">{{ $name }}</a>
+          {{ end }}
+        </div>
+        <div class="service-panels">
+          {{ range $index, $name := $names }}
+          <section class="service-panel" id="service-panel-{{ $index }}" aria-labelledby="service-tab-{{ $index }}">
+            {{ template "run-service" (index $.Services $name) }}
+          </section>
+          {{ end }}
+        </div>
       </div>
-      {{ else }}<p class="muted">No saved overrides.</p>{{ end }}
+      {{ else }}<p class="muted">No service details available.</p>{{ end }}
+    </section>
+
+    {{ if and (not .InProgress) (or .Failure .Pending) }}
+    <section class="panel failure" aria-labelledby="failure-title">
+      <h2 id="failure-title">Run activity</h2>
+      <dl class="compact-facts">
+        {{ if .Pending }}<dt>Caddy route</dt><dd>Confirmation pending</dd>{{ end }}
+        {{ if .FailurePhase }}<dt>Failure phase</dt><dd>{{ .FailurePhase }}</dd>{{ end }}
+        {{ if .Failure }}<dt>Details</dt><dd><pre>{{ .Failure }}</pre></dd>{{ end }}
+      </dl>
     </section>
     {{ end }}
+
+    <section class="panel run-details" aria-label="Run details">
+      <dl class="run-facts">
+        {{ if .TemplateName }}<div><dt>Source template</dt><dd>{{ .TemplateName }}</dd></div>{{ end }}
+        <div><dt>Hostname</dt><dd>{{ .Hostname }}</dd></div>
+        <div><dt>Expires</dt><dd>{{ if .ExpiresAt }}<time datetime="{{ .ExpiresAt }}">{{ .ExpiryLabel }}</time>{{ else }}—{{ end }}</dd></div>
+      </dl>
+      {{ if .APIOwned }}
+      <details {{ if or .InProgress .Failure }}open{{ end }}>
+        <summary>Launch log</summary>
+        <ol class="progress-log" id="progress-log" aria-label="Launch activity" aria-live="polite" tabindex="0" {{ if not .Activity }}hidden{{ end }}>
+          {{ range .Activity }}
+          <li><time datetime="{{ .Time.Format "2006-01-02T15:04:05Z07:00" }}">{{ .Time.Format "2006-01-02 15:04:05" }} UTC</time><span>{{ .Message }}</span></li>
+          {{ end }}
+        </ol>
+        <p id="progress-empty" class="muted" {{ if .Activity }}hidden{{ end }}>{{ if .InProgress }}Waiting for startup to begin…{{ else }}No launch activity was recorded for this run.{{ end }}</p>
+        <p class="feedback" id="poll-status" role="status"></p>
+      </details>
+      {{ end }}
+      <details id="original-manifest">
+        <summary>Original manifest</summary>
+        <pre id="manifest-source" class="manifest-source" aria-label="Original Compose YAML" tabindex="0" hidden></pre>
+        <p id="manifest-status" class="feedback" role="status"></p>
+        <noscript><a href="/ui/stacks/manifest?id={{ .ID }}">Open original YAML</a></noscript>
+      </details>
+    </section>
   </main>
   <script src="/ui/controller.js" defer></script>
 </body>
 </html>
+
+{{ define "run-service" }}
+<div class="service-environment">
+  <div class="service-view-heading">
+    <h3>Environment overrides</h3>
+    <span class="muted environment-read-only">Read-only</span>
+  </div>
+  <div class="environment-service code-editor" hidden></div>
+  <div class="run-environment-fallback">
+    {{ if .Environment }}
+    <dl class="compact-facts">
+      {{ range $key, $value := .Environment }}
+      <dt><code>{{ $key }}</code></dt>
+      <dd>{{ if eq $value "" }}<span class="muted">Empty string</span>{{ else }}<pre><span>{{ $value }}</span></pre>{{ end }}</dd>
+      {{ end }}
+    </dl>
+    {{ else }}<p class="muted">No saved overrides.</p>{{ end }}
+  </div>
+  <script type="application/json">{{ .Environment }}</script>
+</div>
+<div class="service-image">
+  <h3>{{ if or .Image.ID (not .Source.Value) }}Image{{ else }}Configured source{{ end }}</h3>
+  {{ if .Image.ID }}
+  {{ if .Image.Reference }}<p><code>{{ .Image.Reference }}</code></p>{{ end }}
+  <p class="image-id"><span>Image ID</span> <code>{{ .Image.ID }}</code></p>
+  {{ if .Image.Repository }}<p class="image-id"><span>Git revision</span> <code>{{ .Image.Repository }}@{{ .Image.Commit }}</code></p>{{ end }}
+  {{ else if .Source.Value }}
+  <p><code>{{ if .Source.Repository }}{{ .Source.Repository }}@{{ end }}{{ .Source.Value }}</code></p>
+  {{ else }}<p class="muted">No image is recorded.</p>{{ end }}
+</div>
+{{ end }}

@@ -64,7 +64,7 @@ func TestEnvironmentReadOnlyAfterLaunch(t *testing.T) {
 	if w := serve(a, "PUT", path, clear); w.Code != 409 {
 		t.Fatalf("clear during launch: %d %s", w.Code, w.Body)
 	}
-	requirePage(t, a, "/ui/stacks?id="+id, "Saved overrides are read-only", "initial")
+	requirePage(t, a, "/ui/stacks?id="+id, "Read-only", "initial")
 	if changed, err := a.db.Fail(t.Context(), id, "acquisition", "missing source"); err != nil || !changed {
 		t.Fatalf("record failed acquisition: changed=%v err=%v", changed, err)
 	}

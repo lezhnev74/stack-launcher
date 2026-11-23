@@ -4,7 +4,7 @@ import {yaml} from '@codemirror/lang-yaml';
 import {HighlightStyle, StreamLanguage, syntaxHighlighting} from '@codemirror/language';
 import {linter, lintGutter} from '@codemirror/lint';
 import {Compartment, EditorState} from '@codemirror/state';
-import {EditorView, keymap, placeholder} from '@codemirror/view';
+import {EditorView, keymap, lineNumbers, placeholder} from '@codemirror/view';
 import {tags} from '@lezer/highlight';
 import {formatEnvironment, parseEnvironment} from './assignments.js';
 
@@ -66,6 +66,21 @@ const codeEditing = [
 
 function readOnlyExtensions(readOnly) {
   return [EditorState.readOnly.of(readOnly), EditorView.editable.of(!readOnly)];
+}
+
+export function mountReadOnlyEnvironment(parent, service, saved) {
+  return new EditorView({
+    doc: formatEnvironment(saved),
+    parent,
+    extensions: [
+      editorTheme, colors, assignmentLanguage, lineNumbers(), EditorView.lineWrapping,
+      readOnlyExtensions(true), placeholder('No saved overrides.'),
+      EditorView.contentAttributes.of({
+        'aria-label': `Environment overrides for ${service}`,
+        tabindex: '0',
+      }),
+    ],
+  });
 }
 
 export function mountManifestEditor(parent, doc, onChange) {

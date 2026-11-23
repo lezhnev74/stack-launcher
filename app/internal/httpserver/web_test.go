@@ -43,7 +43,15 @@ func TestWebPages(t *testing.T) {
 	if err := db.Create(ctx, "..", "legacy.example", time.Hour); err != nil {
 		t.Fatal(err)
 	}
-	if err := db.CreateAPI(ctx, "checkout", "checkout.example", time.Hour); err != nil {
+	env := ledger.Environment{"web": {"APP_MODE": "checkout"}}
+	if err := db.CreateAPIWithEnvironment(ctx, "checkout", "checkout.example", time.Hour, env); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.SaveManifest(ctx, "checkout", ledger.Manifest{Content: []byte(runManifest)}); err != nil {
+		t.Fatal(err)
+	}
+	image := ledger.Image{ID: strings.Repeat("a", 64), Reference: "docker.io/library/nginx:deployed"}
+	if err := db.SaveImages(ctx, "checkout", map[string]ledger.Image{"web": image}); err != nil {
 		t.Fatal(err)
 	}
 	if err := db.Pending(ctx, "checkout"); err != nil {
@@ -58,6 +66,9 @@ func TestWebPages(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err := db.CreateAPI(ctx, "catalog", "catalog.example", time.Hour); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.SaveManifest(ctx, "catalog", ledger.Manifest{Content: []byte(runManifest + "unsupported_field: true\n")}); err != nil {
 		t.Fatal(err)
 	}
 	if changed, err := db.Fail(ctx, "catalog", "startup", "<script>alert('bad')</script>"); err != nil || !changed {
@@ -94,8 +105,31 @@ func TestWebPages(t *testing.T) {
 				t.Errorf("stack %s status absent from list or detail: %q", id, value)
 			}
 		}
+		sections := []string{
+			`aria-current="page">` + id, `id="access-title"`, `id="services-title"`, `>web</a>`,
+			`<h3>Environment overrides</h3>`, `<div class="service-image">`, `<summary>Launch log</summary>`, `<summary>Original manifest</summary>`,
+		}
+		rest := body
+		for _, section := range sections {
+			_, after, found := strings.Cut(rest, section)
+			if !found {
+				t.Fatalf("stack %s missing or out-of-order markup %q", id, section)
+			}
+			rest = after
+		}
 		if id == "checkout" {
 			checkReadyPage(t, status, list.Body.String(), body)
+			if label := expiresAt.Format("2 Jan 2006, 15:04 MST"); !strings.Contains(body, label) {
+				t.Errorf("readable expiry missing %q", label)
+			}
+			for _, value := range []string{image.Reference, image.ID, "team/worker@main", "<code>APP_MODE</code>", `"APP_MODE":"checkout"`, "lucide-pause", "lucide-trash"} {
+				if !strings.Contains(body, value) {
+					t.Errorf("run details missing %q", value)
+				}
+			}
+			if strings.Contains(body, "docker.io/library/nginx:1-alpine") {
+				t.Error("configured image shown in place of the pinned image")
+			}
 		} else if status.Failure == "" || !strings.Contains(body, "<dd>"+status.FailurePhase+"</dd>") ||
 			!strings.Contains(body, "<pre>"+html.EscapeString(status.Failure)+"</pre>") || strings.Contains(body, "<script>") {
 			t.Fatalf("failure escaping: %s", body)

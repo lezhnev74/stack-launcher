@@ -58,7 +58,8 @@ func TestManifestTemplateUploadAndLaunch(t *testing.T) {
 		t.Fatalf("saved launch manifest: %q, %v", manifest.Content, err)
 	}
 	detail := serve(a, "GET", "/ui/stacks?id="+id, "")
-	if detail.Code != 200 || !strings.Contains(detail.Body.String(), `<code>web</code> <span class="muted">0 overrides</span>`) {
+	if detail.Code != 200 || !strings.Contains(detail.Body.String(), `href="#service-panel-0">web</a>`) ||
+		!strings.Contains(detail.Body.String(), "No saved overrides.") {
 		t.Fatalf("missing service with no saved overrides: %d", detail.Code)
 	}
 }

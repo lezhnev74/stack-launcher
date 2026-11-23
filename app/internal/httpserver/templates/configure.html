@@ -9,10 +9,10 @@
 <body>
   {{ if .ID }}{{ template "nav" "runs" }}{{ else }}{{ template "nav" "templates" }}{{ end }}
   <main>
-    <a class="back-link" href="{{ if .ID }}/ui{{ else }}/ui/templates{{ end }}">{{ if .ID }}All runs{{ else }}All templates{{ end }}</a>
+    {{ if .ID }}{{ template "run-breadcrumbs" .ID }}{{ else }}<a class="back-link" href="/ui/templates">All templates</a>{{ end }}
     <header class="page-heading">
       <div>
-        <h1>{{ if .ID }}{{ .ID }} <span class="state" data-state="draft">draft</span>{{ else if .Name }}{{ .Name }}{{ else }}New template{{ end }}</h1>
+        <h1>{{ if .ID }}Run configuration <span class="state" data-state="draft">draft</span>{{ else if .Name }}{{ .Name }}{{ else }}New template{{ end }}</h1>
       </div>
       {{ if not .ID }}
       <div class="template-save">
@@ -64,9 +64,9 @@
           <dt>Time to live</dt><dd>7 days from launch</dd>
         </dl>
         {{ if .LaunchDisabled }}<p class="notice">{{ .LaunchDisabled }}</p>{{ end }}
-        <button class="primary launch" type="submit" value="launch" disabled>Launch run</button>
+        <button class="primary launch with-icon" type="submit" value="launch" disabled>{{ template "icon" "play" }}Launch run</button>
         <button type="submit" value="save" disabled>Save draft</button>
-        <button type="button" class="danger" id="remove-draft" disabled>Discard draft</button>
+        <button type="button" class="danger with-icon" id="remove-draft" disabled>{{ template "icon" "trash" }}Discard draft</button>
         <p id="configuration-feedback" class="feedback" role="status">Loading configuration…</p>
       </aside>
       {{ else }}
